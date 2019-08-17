@@ -1,0 +1,1 @@
+dsn = 'postgres://postgres:somesecurepassword@localhost:5432/image_managre'
