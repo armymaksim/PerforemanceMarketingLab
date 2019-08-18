@@ -1,0 +1,15 @@
+version: '2'
+services:
+  postgres_preprod:
+    image: postgres:10
+    environment:
+     POSTGRES_PASSWORD: "olzeMyparol90"
+     PGDATA: "/PG_DATA"
+     POSTGRES_DB: image_manager
+    container_name: postgres
+    restart: unless-stopped
+    volumes:
+      - ./Dockerfiles/001_data.sql:/docker-entrypoint-initdb.d/001_data.sql
+      - "/Users/maksimkozlov/PG_DATA:/PG_DATA"
+    ports:
+        - "5432:5432"

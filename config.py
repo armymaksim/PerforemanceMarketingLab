@@ -1,1 +1,1 @@
-dsn = 'postgres://postgres:somesecurepassword@localhost:5432/image_managre'
+dsn = 'postgres://postgres:olzeMyparol90@localhost:5432/image_manager'

@@ -4,8 +4,12 @@ import asyncpg
 from aiohttp import web
 from image_manager.urls import ImageView
 from importlib._bootstrap_external import SourceFileLoader
-
-
+from jinja2 import Environment, PackageLoader, select_autoescape
+env = Environment(
+    loader=PackageLoader('image_manager', 'templates'),
+    autoescape=select_autoescape(['html', 'xml']),
+    enable_async=True
+)
 def get_config():
     if len(sys.argv) > 1:
         config = SourceFileLoader("config", sys.argv[1]).load_module()
@@ -16,9 +20,17 @@ def get_config():
 
 
 async def init_app(loop):
-    app = web.Application(loop=loop)
-    app.db = await asyncpg.pool.create_pool(get_config())
-    web.view('/', ImageView)
+    app = web.Application()
+    try:
+        app.db = await asyncpg.pool.create_pool(get_config())
+    except asyncpg.exceptions.InvalidCatalogNameError:
+        raise Exception('DSN сконфигурирован неверно или БД не проинициализированна корректно')
+    app.router.add_view('/', ImageView)
+    app.jinja = env
+    app.upload_path = '../upload'
+    app.add_routes([web.static('/upload', '../upload'),
+                    web.static('/static', '../static')])
+
     return app
 
 loop = asyncio.get_event_loop()

@@ -7,10 +7,10 @@ Images = sa.Table(
         sa.Column('name', String, nullable=False),
         sa.Column('original_file_name', String, nullable=False),
         sa.Column('image_md5', String, nullable=False, unique=True, index=True),
-        sa.Column('file_path', String, nullable=False),
+        sa.Column('file_type', String, nullable=False),
         sa.Column('file_size', Integer, nullable=False),
-        sa.Column('exif_vendor', String, nullable=False),
-        sa.Column('exif_model', String, nullable=False),
-        sa.Column('exif_date', DateTime, server_default=text('current_timestamp')),
+        sa.Column('exif_vendor', String),
+        sa.Column('exif_model', String),
+        sa.Column('exif_date', DateTime),
         sa.Column('upload_date', DateTime, server_default=text('current_timestamp'))
     )
