@@ -8,7 +8,10 @@ setup(
                       'aiodns',
                       'aiohttp',
                       'asyncpg',
-                      'asyncpgsa'
+                      'asyncpgsa',
+                      'Pillow',
+                      'jinja2',
+                      'sqlalchemy'
                       ],
     include_package_data=True,
     packages=find_packages(),
