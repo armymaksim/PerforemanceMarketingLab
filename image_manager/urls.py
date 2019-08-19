@@ -1,20 +1,15 @@
 import os
-from _md5 import md5
-from io import BytesIO
-from pprint import pprint
-
-import PIL.ExifTags
-
 import aiohttp
 import asyncpgsa
+import PIL.ExifTags
+from _md5 import md5
 from PIL import Image
+from io import BytesIO
 from aiohttp import web
 from datetime import datetime
-
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 from sqlalchemy import text, func, select
-
 from image_manager.db_models import Images
 
 
@@ -74,10 +69,8 @@ class ImageView(web.View):
         query_string, params = asyncpgsa.compile_query(query)
         async with self.request.app.db.acquire() as conn:
             res = await conn.fetchrow(query_string, *params)
-        print(dir(res))
         if not res:
             return Response(body='Изображение не найдено', status=404, headers={'Content-Type': 'text/html'})
-        pprint(res)
         source_path = self.get_file_path(res.get('image_md5'),
                                          mimetype=res.get('file_type'))
         thumb_path = self.get_file_path(res.get('image_md5'),
@@ -135,7 +128,6 @@ class ImageView(web.View):
     async def exists(self):
         query = select([func.count(text('*'))]).select_from(Images.select().where(Images.c.image_md5==self.filename).alias())
         query_string, params = asyncpgsa.compile_query(query)
-        print(query_string)
         async with self.request.app.db.acquire() as conn:
             if await conn.fetchval(query_string, *params)>0:
                 raise aiohttp.web.HTTPConflict(reason='Данное изображение уже существует!!!')

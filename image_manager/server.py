@@ -27,15 +27,15 @@ async def init_app(loop):
         raise Exception('DSN сконфигурирован неверно или БД не проинициализированна корректно')
     app.router.add_view('/', ImageView)
     app.jinja = env
-    app.upload_path = '../upload'
-    app.add_routes([web.static('/upload', '../upload'),
-                    web.static('/static', '../static')])
+    app.upload_path = './upload'
+    app.add_routes([web.static('/upload', './upload'),
+                    web.static('/static', './static')])
 
     return app
 
 loop = asyncio.get_event_loop()
 app = loop.run_until_complete(init_app(loop))
-def run(port=80):
+def run(port=8080):
     web.run_app(app, port=port)
 
 if __name__=='__main__':
