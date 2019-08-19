@@ -11,25 +11,29 @@ from image_manager.file_manager import Image_manager
 class ImageView(web.View):
 
     async def get(self):
-        l_o = self.fetch_query_data()
-        return await self.render_page(**l_o)
+        return await self.render_page()
 
     async def post(self):
-        data = {key: self.request.query.getone(key) for key in self.request.query.keys()}
         form_data = await self.fetch_form_data()
         IM = Image_manager(**form_data)
         if await self.exists(IM.image_md5):
-            raise aiohttp.web.HTTPBadRequest(reason='Данное изображение уже существует!!!')
+            return await self.render_page(reason='Данное изображение уже существует!!!')
         try:
             IM.load_image()
         except IOError:
-            raise aiohttp.web.HTTPBadRequest(reason='Загружаемый файл не является изображением!!!')
+            return await self.render_page(reason='Загружаемый файл не является изображением!!!')
         IM.make_thumb()
         IM.get_exif_data()
-        IM.write_files(self.request.app.upload_path)
-        await self.save_to_db(IM.as_dict())
-        l_o = self.fetch_query_data()
-        return await self.render_page(**l_o)
+        try:
+            IM.write_files(self.request.app.upload_path)
+        except:
+            return await self.render_page(reason=' Не удалось сохранить файл')
+        try:
+            await self.save_to_db(IM.as_dict())
+        except:
+            IM.delete_image(self.request.app.upload_path)
+            return await self.render_page(reason=' Не удалось сохранить запись в БД')
+        raise web.HTTPFound('/')
 
     async def delete(self):
         data = await self.request.json()
@@ -49,8 +53,7 @@ class ImageView(web.View):
         async with self.request.app.db.acquire() as conn:
             res = await conn.fetchrow(query_string, *params)
         img.delete_image(self.request.app.upload_path)
-        l_o = self.fetch_query_data()
-        return await self.render_page(**l_o)
+        return Response(body='OK', status=200, headers={'Content-Type': 'text/html'})
 
     def fetch_query_data(self) -> dict:
         """
@@ -61,11 +64,13 @@ class ImageView(web.View):
         """
         legal_keys = ['limit', 'offset']
         try:
-            data = {key: int(self.request.query.getone(key) or 0)
+            data = {key: int(self.request.query.getone(key, 0))
                 for key in self.request.query.keys()
                 if key in legal_keys}
-        except:
-            data = dict(zip(legal_keys, [30, 0]))
+        finally:
+            if not data:
+                data = dict(zip(legal_keys, [30, 0]))
+
         return data
 
 
@@ -105,12 +110,11 @@ class ImageView(web.View):
         return res
 
     async def exists(self, filename):
-        print(filename)
         query = select([func.count(text('*'))]).select_from(Images.select().where(Images.c.image_md5==filename).alias())
         query_string, params = asyncpgsa.compile_query(query)
         async with self.request.app.db.acquire() as conn:
             if await conn.fetchval(query_string, *params)>0:
-                raise aiohttp.web.HTTPConflict(reason='Данное изображение уже существует!!!')
+                return True
         return False
 
     async def save_to_db(self, image_object):
@@ -126,11 +130,12 @@ class ImageView(web.View):
             res = await conn.fetchrow(query_string, *params)
 
 
-    async def render_page(self,
-                          limit=30,
-                          offset=0,
-                          order='desc',
-                          by='upload_date'):
+    async def render_page(self, reason=None):
+        l_o = self.fetch_query_data()
+        limit = l_o.get('limit')
+        offset = l_o.get('offset')
+        order = 'desc',
+        by = 'upload_date'
         orderby = getattr(Images.c, by, None)
         if orderby is None:
             orderby = Images.c.upload_date
@@ -148,7 +153,7 @@ class ImageView(web.View):
                 tmp = Image_manager.init_from_db_row(row)
                 res.append(tmp.serialize())
         template = self.request.app.jinja.get_template('index.html')
-        data = await template.render_async(res=res)
+        data = await template.render_async(res=res, reason=reason)
         return Response(body=data, status=200, headers={'Content-Type':'text/html'})
 
 

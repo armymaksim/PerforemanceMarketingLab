@@ -28,8 +28,8 @@ async def init_app(loop):
     app.router.add_view('/', ImageView)
     app.jinja = env
     app.upload_path = './upload'
-    app.add_routes([web.static('/upload', '../upload'),
-                    web.static('/static', '../static')])
+    app.add_routes([web.static('/upload', app.upload_path),
+                    web.static('/static', './static')])
 
     return app
 

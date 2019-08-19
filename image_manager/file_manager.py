@@ -15,8 +15,8 @@ class Image_manager():
         'file_type',
         'original_file_name',
         'image_md5',
-        'vendor',
-        'model',
+        'exif_vendor',
+        'exif_model',
         'exif_date',
         'image',
         'thumb',
@@ -31,15 +31,13 @@ class Image_manager():
         self.file_type = kwargs.get('file_type')
         self.original_file_name = kwargs.get('original_file_name')
         self.image_md5 = kwargs.get('image_md5', None)
-        print(self.image_md5)
         if not self.image_md5:
             if not self.file:
                 raise Exception('Невозможно инициализировать инстанс - недостаточно данных')
             else:
                 self.image_md5 = self.get_file_name()
-        print(self.image_md5)
-        self.vendor = kwargs.get('vendor', None)
-        self.model = kwargs.get('model', None)
+        self.exif_vendor = kwargs.get('exif_vendor', None)
+        self.exif_model = kwargs.get('exif_model', None)
         self.exif_date = kwargs.get('exif_date', None)
         self.image = None
         self.thumb = None
@@ -65,8 +63,8 @@ class Image_manager():
             }
         else:
             exif = {}
-        self.vendor = exif.get('Make', None)
-        self.model = exif.get('Model', None)
+        self.exif_vendor = exif.get('Make', None)
+        self.exif_model = exif.get('Model', None)
         self.exif_date = exif.get('DateTimeOriginal', None)
         if self.exif_date:
             self.exif_date = datetime.strptime(self.exif_date,
@@ -125,22 +123,23 @@ class Image_manager():
 
     def as_dict(self):
         return {
-            'name': self.user_image_name,
+            'user_image_name': self.user_image_name,
             'original_file_name': self.original_file_name,
             'image_md5': self.image_md5,
             'file_type': self.file_type,
             'file_size': self.file_size,
-            'exif_vendor': self.vendor,
-            'exif_model': self.model,
+            'exif_vendor': self.exif_vendor,
+            'exif_model': self.exif_model,
             'exif_date': self.exif_date,
             'upload_date': self.upload_date or datetime.now()
         }
 
     def serialize(self):
-        tmp = self.as_dict()
+        tmp = {key:getattr(self, key, '') for key in self.__slots__ \
+                if getattr(self, key, '')}
         format_date = lambda x: x.strftime('%Y-%m-%d %H:%M') if x else ''
         tmp['upload_date'] = format_date(tmp['upload_date'])
-        tmp['exif_date'] = format_date(tmp['exif_date'])
+        tmp['exif_date'] = format_date(tmp.get('exif_date', None))
         tmp['prview_url'] = self.get_file_path(tmp['image_md5'],
                                                '/upload',
                                                mimetype=tmp['file_type'],

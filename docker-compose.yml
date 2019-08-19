@@ -14,7 +14,7 @@ services:
         tag: "{{.Name}}"
     volumes:
       - ./Dockerfiles/001_data.sql:/docker-entrypoint-initdb.d/001_data.sql
-      - "/Users/maksimkozlov/PG_DATA:/PG_DATA"
+      - "/var/PG_DATA:/PG_DATA"
     ports:
         - "5432:5432"
   web:

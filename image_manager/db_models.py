@@ -4,7 +4,7 @@ from sqlalchemy import Integer, String, DateTime, text
 Images = sa.Table(
         'images', sa.MetaData(),
         sa.Column('id', Integer, primary_key=True),
-        sa.Column('name', String, nullable=False),
+        sa.Column('user_image_name', String),
         sa.Column('original_file_name', String, nullable=False),
         sa.Column('image_md5', String, nullable=False, unique=True, index=True),
         sa.Column('file_type', String, nullable=False),
