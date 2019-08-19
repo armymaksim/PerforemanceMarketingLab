@@ -129,9 +129,10 @@ async function delete_img(del_obj){
 
 let result = await response.text();
 alert(result);
-location.reload();
+window.location =window.location ;
 }
 </script>
+{% if reason %}<b>{{ reason }}</b>{% endif %}
 <form action="/" method="post" enctype="multipart/form-data">
     <input type="text" name="name">
     <input type="file", name="file">
@@ -157,18 +158,18 @@ location.reload();
     <tr>
         <td><img id="myImg"
                  src="{{row.get('prview_url', '')}}"
-                 alt="{{row.get('name', '')}}"
+                 alt="{{row.get('user_image_name', '')}}"
                  height="150"
                  width="150"
                  onclick="preview(this);"
         ></td>
-        <td>{{row.get('name', '')}}</td>
+        <td>{{row.get('user_image_name', '')}}</td>
         <td>{{row.get('exif_vendor', '')}}</td>
         <td>{{row.get('exif_model', '')}}</td>
         <td>{{row.get('file_size', '')}}</td>
         <td>{{row.get('exif_date', '')}}</td>
         <td>{{row.get('upload_date', '')}}</td>
-        <td><img id="{{row.id}}"
+        <td><img id="{{row.get('id')}}"
                  src="/static/delete.png"
                  alt="delete"
                  height="75"

@@ -2,7 +2,7 @@ import asyncio
 import sys
 import asyncpg
 from aiohttp import web
-from image_manager.urls import ImageView
+from  image_manager.urls import ImageView
 from importlib._bootstrap_external import SourceFileLoader
 from jinja2 import Environment, PackageLoader, select_autoescape
 env = Environment(
@@ -28,13 +28,14 @@ async def init_app(loop):
     app.router.add_view('/', ImageView)
     app.jinja = env
     app.upload_path = './upload'
-    app.add_routes([web.static('/upload', './upload'),
+    app.add_routes([web.static('/upload', app.upload_path),
                     web.static('/static', './static')])
 
     return app
 
 loop = asyncio.get_event_loop()
 app = loop.run_until_complete(init_app(loop))
+
 def run(port=8080):
     web.run_app(app, port=port)
 
