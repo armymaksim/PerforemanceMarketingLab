@@ -168,7 +168,7 @@ location.reload();
         <td>{{row.get('file_size', '')}}</td>
         <td>{{row.get('exif_date', '')}}</td>
         <td>{{row.get('upload_date', '')}}</td>
-        <td><img id="{{row.id}}"
+        <td><img id="{{row.get('id')}}"
                  src="/static/delete.png"
                  alt="delete"
                  height="75"

@@ -1,38 +1,24 @@
-import os
 import aiohttp
 import asyncpgsa
-import PIL.ExifTags
-from _md5 import md5
-from PIL import Image
 from io import BytesIO
 from aiohttp import web
-from datetime import datetime
-from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 from sqlalchemy import text, func, select
 from image_manager.db_models import Images
-from image_manager.image_manager import Image_manager
+from image_manager.file_manager import Image_manager
 
 
 class ImageView(web.View):
 
     async def get(self):
-        data = {key: self.request.query.getone(key) for key in self.request.query.keys()}
-        return await self.render_page()
+        l_o = self.fetch_query_data()
+        return await self.render_page(**l_o)
 
     async def post(self):
-        await self.save_new_image()
-        return await self.render_page()
-
-    async def delete(self):
-        await self.delete_image()
-        return await self.render_page()
-
-    async def save_new_image(self):
         data = {key: self.request.query.getone(key) for key in self.request.query.keys()}
         form_data = await self.fetch_form_data()
         IM = Image_manager(**form_data)
-        if await self.exists(IM.filename):
+        if await self.exists(IM.image_md5):
             raise aiohttp.web.HTTPBadRequest(reason='Данное изображение уже существует!!!')
         try:
             IM.load_image()
@@ -40,29 +26,48 @@ class ImageView(web.View):
             raise aiohttp.web.HTTPBadRequest(reason='Загружаемый файл не является изображением!!!')
         IM.make_thumb()
         IM.get_exif_data()
-        IM.write_files()
-        await self.save_to_db(IM.as_dict)
+        IM.write_files(self.request.app.upload_path)
+        await self.save_to_db(IM.as_dict())
+        l_o = self.fetch_query_data()
+        return await self.render_page(**l_o)
 
-        return True
-
-    async def delete_image(self):
+    async def delete(self):
         data = await self.request.json()
         try:
             id = int(data['id'])
         except:
-            return Response(body='Неверный идентификатор', status=400, headers={'Content-Type':'text/html'})
-        query = Images.select().where(Images.c.id==id)
+            return Response(body='Неверный идентификатор', status=400, headers={'Content-Type': 'text/html'})
+        query = Images.select().where(Images.c.id == id)
         query_string, params = asyncpgsa.compile_query(query)
         async with self.request.app.db.acquire() as conn:
             res = await conn.fetchrow(query_string, *params)
         if not res:
             return Response(body='Изображение не найдено', status=404, headers={'Content-Type': 'text/html'})
-
+        img = Image_manager.init_from_db_row(res)
         query = Images.delete().where(Images.c.id == id)
         query_string, params = asyncpgsa.compile_query(query)
         async with self.request.app.db.acquire() as conn:
             res = await conn.fetchrow(query_string, *params)
-        return Response(body='OK', status=200, headers={'Content-Type':'text/html'})
+        img.delete_image(self.request.app.upload_path)
+        l_o = self.fetch_query_data()
+        return await self.render_page(**l_o)
+
+    def fetch_query_data(self) -> dict:
+        """
+        Выборка параметров пагинации из запроса (limit, offset)/
+        все остальное отбрасываем.
+        Параметры сортировки можно реализовать здесь же.
+        :return: dict
+        """
+        legal_keys = ['limit', 'offset']
+        try:
+            data = {key: int(self.request.query.getone(key) or 0)
+                for key in self.request.query.keys()
+                if key in legal_keys}
+        except:
+            data = dict(zip(legal_keys, [30, 0]))
+        return data
+
 
     async def fetch_form_data(self):
         original_file_name = None
@@ -100,6 +105,7 @@ class ImageView(web.View):
         return res
 
     async def exists(self, filename):
+        print(filename)
         query = select([func.count(text('*'))]).select_from(Images.select().where(Images.c.image_md5==filename).alias())
         query_string, params = asyncpgsa.compile_query(query)
         async with self.request.app.db.acquire() as conn:
@@ -108,7 +114,6 @@ class ImageView(web.View):
         return False
 
     async def save_to_db(self, image_object):
-
         for key, val in image_object.items():
             col = getattr(Images.c, key, None)
             if col is not None:
@@ -140,13 +145,8 @@ class ImageView(web.View):
         res = []
         async with self.request.app.db.acquire() as conn:
             for row in await conn.fetch(query_string, *params):
-                tmp = dict(row.items())
-                tmp['exif_date']=tmp['exif_date'].strftime('%Y-%m-%d %H:%M') if tmp['exif_date'] else ''
-                tmp['upload_date']=tmp['upload_date'].strftime('%Y-%m-%d %H:%M') if tmp['upload_date'] else ''
-                tmp['prview_url']= self.get_file_path(tmp['image_md5'],
-                                                      mimetype=tmp['file_type'],
-                                                      file_type='thumbs')
-                res.append(tmp)
+                tmp = Image_manager.init_from_db_row(row)
+                res.append(tmp.serialize())
         template = self.request.app.jinja.get_template('index.html')
         data = await template.render_async(res=res)
         return Response(body=data, status=200, headers={'Content-Type':'text/html'})
