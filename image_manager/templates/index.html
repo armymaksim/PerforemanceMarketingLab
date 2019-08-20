@@ -11,7 +11,14 @@ body {font-family: Arial, Helvetica, sans-serif;}
   cursor: pointer;
   transition: 0.3s;
 }
-
+.content {
+  max-width: 1900px;
+  margin: auto;
+}
+.content-right{
+  max-width: 500px;
+  margin: auto;
+}
 #myImg:hover {opacity: 0.7;}
 
 /* The Modal (background) */
@@ -132,17 +139,17 @@ alert(result);
 window.location =window.location ;
 }
 </script>
-{% if reason %}<b>{{ reason }}</b>{% endif %}
-<form action="/" method="post" enctype="multipart/form-data">
-    <input type="text" name="name">
-    <input type="file", name="file">
-    <input type="submit">
+{% if reason %}<b class="content-right" >{{ reason }}</b>{% endif %}
+<form class="content-right" action="/" method="post" enctype="multipart/form-data">
+    <p><input type="text" name="name"></p>
+    <p><input type="file", name="file"></p>
+    <p ><input type="submit"></p>
 </form>
 <br>
 <br>
 <br>
 
-<table border="2">
+<table class="content" border="2">
     <tr>
         <th>Превью фото</th>
         <th>Название фото</th>

@@ -1,13 +1,13 @@
 import os
 from _md5 import md5
 from datetime import datetime
-
 import PIL
 from PIL import Image, ExifTags
 
 
 class Image_manager():
-
+    """Класс работы с изображениями и вводом-выводом
+    """
     __slots__ = (
         'file',
         'user_image_name',
@@ -25,6 +25,19 @@ class Image_manager():
         'upload_path'
     )
     def __init__(self, **kwargs) -> None:
+        """
+        Иницыализируем класс управления изображением
+        Минимальный набор данных - данные строки из БД
+        Или
+                {
+                    'file': file: BytesIO,
+                    'file_size': file_size: int,
+                    'file_type': file_type: str,
+                    'original_file_name': original_file_name,
+                }
+
+        :param kwargs:
+        """
         self.file = kwargs.get('file', None)
         self.user_image_name = kwargs.get('user_image_name', None)
         self.file_size = kwargs.get('file_size', 0)
@@ -47,12 +60,19 @@ class Image_manager():
 
 
     def get_file_name(self):
+        """Формируем системное имя файла из md5 суммы самого файла
+        :return: str
+        """
         self.file.seek(0)
         f_data = self.file.read()
         self.file.seek(0)
         return md5(f_data).hexdigest()
 
     def get_exif_data(self):
+        """Пробуем получить данные exif
+
+        :return: None
+        """
         self.image._getexif()
         exif = self.image._getexif()
         if exif:
@@ -71,6 +91,14 @@ class Image_manager():
                       '%Y:%m:%d %H:%M:%S')
 
     def get_file_path(self, file_name, upload_path, mimetype='jpg', file_type='source'):
+        """
+            Формируем путь до файла
+        :param file_name: md5 сумма файла
+        :param upload_path: Корневой каталог для загрузки файлов
+        :param mimetype: расширение файла
+        :param file_type: ТИп изображения 'source|thumbs'
+        :return:
+        """
         return '/'.join([upload_path,
                          file_type,
                          file_name[0:3],
@@ -78,7 +106,12 @@ class Image_manager():
                          f'{file_name}.{mimetype}']
                         )
 
-    def write_files(self, upload_path):
+    def write_files(self, upload_path) -> None:
+        """
+            Запись фалов на диск
+        :param upload_path:  Корневой каталог для загрузки файлов
+        :return: None
+        """
         source_path = self.get_file_path(self.image_md5,
                                          upload_path,
                                          mimetype=self.file_type)
@@ -92,18 +125,32 @@ class Image_manager():
         self.thumb.save(thumb_path)
 
     def check_or_create_dirs(self, source_path):
+        """
+        Создание промежуточных каталогов для хранения файлов
+        :param source_path:
+        :return:
+        """
         base_path = os.path.dirname(source_path)
         if os.path.exists(base_path):
             return
         else:
-            os.makedirs(base_path, mode=0o710)
+            os.makedirs(base_path, mode=0o711)
 
     def load_image(self):
+        """
+        Превращаем набор байт в изображение и
+        тут же проверяем, что это изображение.
+        :return:
+        """
         self.file.seek(0)
         self.image = Image.open(self.file)
 
 
-    def make_thumb(self):
+    def make_thumb(self) -> None:
+        """
+        Создаем уменьшенную копию изображения
+        :return:
+        """
         index = max(self.image.size)/150
         self.thumb = self.image.resize((
             int(self.image.size[0]//index),
@@ -111,6 +158,11 @@ class Image_manager():
         ))
 
     def delete_image(self, upload_path):
+        """
+        Удаляем изображение с диска
+        :param upload_path:
+        :return:
+        """
         source_path = self.get_file_path(self.image_md5,
                                          upload_path,
                                          mimetype=self.file_type)
@@ -121,7 +173,11 @@ class Image_manager():
         os.unlink(source_path)
         os.unlink(thumb_path)
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
+        """
+        Сериализуем для записи в БД
+        :return: dict
+        """
         return {
             'user_image_name': self.user_image_name,
             'original_file_name': self.original_file_name,
@@ -134,7 +190,11 @@ class Image_manager():
             'upload_date': self.upload_date or datetime.now()
         }
 
-    def serialize(self):
+    def serialize(self) -> dict:
+        """
+        Сериализуем для формирования HTML
+        :return: dict
+        """
         tmp = {key:getattr(self, key, '') for key in self.__slots__ \
                 if getattr(self, key, '')}
         format_date = lambda x: x.strftime('%Y-%m-%d %H:%M') if x else ''
@@ -148,6 +208,11 @@ class Image_manager():
 
     @classmethod
     def init_from_db_row(cls, row):
+        """
+            Инициализируем класс на основе данных БД
+        :param row: строка из БД
+        :return:
+        """
         return cls(**{k:v for k, v in row.items() if k in cls.__slots__})
 
 

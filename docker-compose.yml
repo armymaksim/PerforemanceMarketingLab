@@ -32,7 +32,7 @@ services:
     volumes:
       - ./static:/var/voltmobi/static
       - ./upload:/var/voltmobi/upload
-      - ./config.py:/var/voltmobi/config.py:ro
+      - ./config_prod.py:/usr/local/etc/image_manager/config.py:ro
     ports:
-    - "8081:8080"
-    command: run_image_manager ./config.py
+    - "8082:8080"
+    command: run_image_manager

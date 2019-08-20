@@ -1,8 +1,11 @@
+"""
+Инициализация веб сервиса
+"""
 import asyncio
 import sys
 import asyncpg
 from aiohttp import web
-from  image_manager.urls import ImageView
+from .urls import ImageView
 from importlib._bootstrap_external import SourceFileLoader
 from jinja2 import Environment, PackageLoader, select_autoescape
 env = Environment(
@@ -14,6 +17,7 @@ def get_config():
     if len(sys.argv) > 1:
         config = SourceFileLoader("config", sys.argv[1]).load_module()
     else:
+        # На крайняк попробуем так (дефолтное хранилище админов)
         config = SourceFileLoader("config", '/usr/local/etc/image_manager/config.py').load_module()
     from config import dsn
     return dsn
@@ -39,5 +43,4 @@ app = loop.run_until_complete(init_app(loop))
 def run(port=8080):
     web.run_app(app, port=port)
 
-if __name__=='__main__':
-    run()
+
