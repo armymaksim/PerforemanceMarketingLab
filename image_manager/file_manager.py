@@ -72,16 +72,17 @@ class ImageManager:
 
         :return: None
         """
-        self.image._getexif()
-        exif = self.image._getexif()
-        if exif:
-            exif = {
-                ExifTags.TAGS[k]: v
-                for k, v in exif.items()
-                if k in ExifTags.TAGS
-            }
-        else:
-            exif = {}
+        # Мой не лучший вариант
+        # exif = self.image._getexif()
+        # if exif:
+        #     exif = {
+        #         ExifTags.TAGS[k]: v
+        #         for k, v in exif.items()
+        #         if k in ExifTags.TAGS
+        #     }
+        # else:
+        #     exif = {}
+        exif = self.image.info.get('parsed_exif', {})
         self.exif_vendor = exif.get('Make', None)
         self.exif_model = exif.get('Model', None)
         self.exif_date = exif.get('DateTimeOriginal', None)

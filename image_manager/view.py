@@ -35,7 +35,10 @@ class ImageView(web.View):
             Сохраняет данные о изображении в БД
             :return: Response
         """
-        form_data = await self.fetch_form_data()
+        try:
+            form_data = await self.fetch_form_data()
+        except AssertionError:
+            return await self.render_page(reason='Файл не выбран')
         im = ImageManager(**form_data)
         if await self.exists(im.image_md5):
             return await self.render_page(reason='Данное изображение '
@@ -75,13 +78,13 @@ class ImageView(web.View):
         """
         data = await self.request.text()
         try:
-            id = int(json.loads(data)['id'])
-        except (JSONDecodeError, TypeError, ValueError):
+            image_id = int(json.loads(data)['id'])
+        except (JSONDecodeError, KeyError, TypeError, ValueError):
             return Response(
                 body='Неверный формат входных данных',
                 status=400,
                 headers={'Content-Type': 'text/html'})
-        query = Images.select().where(Images.c.id == id)
+        query = Images.select().where(Images.c.id == image_id)
         query_string, params = asyncpgsa.compile_query(query)
         try:
             async with self.request.app.db.acquire() as conn:
@@ -95,7 +98,7 @@ class ImageView(web.View):
                             status=404,
                             headers={'Content-Type': 'text/html'})
         img = ImageManager.init_from_db_row(res)
-        query = Images.delete().where(Images.c.id == id)
+        query = Images.delete().where(Images.c.id == image_id)
         query_string, params = asyncpgsa.compile_query(query)
         try:
             async with self.request.app.db.acquire() as conn:
@@ -121,18 +124,18 @@ class ImageView(web.View):
         Параметры сортировки можно реализовать здесь же.
         :return: dict
         """
-        legal_keys = ['limit', 'offset']
-        data = None
+        data = {}
         try:
             data = {
                 key: int(self.request.query.getone(key, 0))
                 for key in self.request.query.keys()
-                if key in legal_keys
             }
         finally:
-            if not data:
-                data = dict(zip(legal_keys, [30, 0]))
-        return data
+            rows_per_page = data.get('rows_per_page', 30)
+            if rows_per_page>30:
+                rows_per_page=30
+            page = data.get('page', 1)
+        return rows_per_page, page
 
     async def fetch_form_data(self):
         """
@@ -214,9 +217,8 @@ class ImageView(web.View):
         :param reason: Текстовое описание причины ошибки
         :return: Response
         """
-        l_o = self.fetch_query_data()
-        limit = l_o.get('limit')
-        offset = l_o.get('offset')
+        rows_per_page, page = self.fetch_query_data()
+        page = page-1
         order = 'desc',
         by = 'upload_date'
         orderby = getattr(Images.c, by, None)
@@ -227,8 +229,8 @@ class ImageView(web.View):
             sort = orderby.asc()
         query = Images.select()\
             .order_by(sort)\
-            .limit(limit)\
-            .offset(limit*offset)
+            .limit(rows_per_page)\
+            .offset(rows_per_page*page)
         query_string, params = asyncpgsa.compile_query(query)
         res = []
         async with self.request.app.db.acquire() as conn:
