@@ -5,7 +5,7 @@ import asyncio
 import sys
 import asyncpg
 from aiohttp import web
-from .urls import ImageView
+from .view import ImageView
 from importlib._bootstrap_external import SourceFileLoader
 from jinja2 import Environment, PackageLoader, select_autoescape
 env = Environment(
@@ -13,12 +13,17 @@ env = Environment(
     autoescape=select_autoescape(['html', 'xml']),
     enable_async=True
 )
+
+
 def get_config():
     if len(sys.argv) > 1:
         config = SourceFileLoader("config", sys.argv[1]).load_module()
     else:
         # На крайняк попробуем так (дефолтное хранилище админов)
-        config = SourceFileLoader("config", '/usr/local/etc/image_manager/config.py').load_module()
+        config = SourceFileLoader(
+            "config",
+            '/usr/local/etc/image_manager/config.py'
+        ).load_module()
     from config import dsn
     return dsn
 
@@ -28,7 +33,8 @@ async def init_app(loop):
     try:
         app.db = await asyncpg.pool.create_pool(get_config())
     except asyncpg.exceptions.InvalidCatalogNameError:
-        raise Exception('DSN сконфигурирован неверно или БД не проинициализированна корректно')
+        raise Exception('DSN сконфигурирован неверно '
+                        'или БД не проинициализированна корректно')
     app.router.add_view('/', ImageView)
     app.jinja = env
     app.upload_path = './upload'
@@ -40,7 +46,6 @@ async def init_app(loop):
 loop = asyncio.get_event_loop()
 app = loop.run_until_complete(init_app(loop))
 
+
 def run(port=8080):
     web.run_app(app, port=port)
-
-

@@ -1,11 +1,10 @@
 import os
 from _md5 import md5
 from datetime import datetime
-import PIL
 from PIL import Image, ExifTags
 
 
-class Image_manager():
+class ImageManager:
     """Класс работы с изображениями и вводом-выводом
     """
     __slots__ = (
@@ -24,6 +23,7 @@ class Image_manager():
         'upload_date',
         'upload_path'
     )
+
     def __init__(self, **kwargs) -> None:
         """
         Иницыализируем класс управления изображением
@@ -46,7 +46,8 @@ class Image_manager():
         self.image_md5 = kwargs.get('image_md5', None)
         if not self.image_md5:
             if not self.file:
-                raise Exception('Невозможно инициализировать инстанс - недостаточно данных')
+                raise Exception('Невозможно инициализировать инстанс'
+                                ' - недостаточно данных')
             else:
                 self.image_md5 = self.get_file_name()
         self.exif_vendor = kwargs.get('exif_vendor', None)
@@ -56,8 +57,6 @@ class Image_manager():
         self.thumb = None
         self.id = kwargs.get('id', None)
         self.upload_date = kwargs.get('upload_date') or datetime.now()
-
-
 
     def get_file_name(self):
         """Формируем системное имя файла из md5 суммы самого файла
@@ -77,7 +76,7 @@ class Image_manager():
         exif = self.image._getexif()
         if exif:
             exif = {
-                PIL.ExifTags.TAGS[k]: v
+                ExifTags.TAGS[k]: v
                 for k, v in exif.items()
                 if k in ExifTags.TAGS
             }
@@ -87,10 +86,18 @@ class Image_manager():
         self.exif_model = exif.get('Model', None)
         self.exif_date = exif.get('DateTimeOriginal', None)
         if self.exif_date:
-            self.exif_date = datetime.strptime(self.exif_date,
-                      '%Y:%m:%d %H:%M:%S')
+            self.exif_date = datetime.strptime(
+                self.exif_date,
+                '%Y:%m:%d %H:%M:%S'
+            )
 
-    def get_file_path(self, file_name, upload_path, mimetype='jpg', file_type='source'):
+    def get_file_path(
+            self,
+            file_name,
+            upload_path,
+            mimetype='jpg',
+            file_type='source'
+    ):
         """
             Формируем путь до файла
         :param file_name: md5 сумма файла
@@ -145,7 +152,6 @@ class Image_manager():
         self.file.seek(0)
         self.image = Image.open(self.file)
 
-
     def make_thumb(self) -> None:
         """
         Создаем уменьшенную копию изображения
@@ -195,9 +201,17 @@ class Image_manager():
         Сериализуем для формирования HTML
         :return: dict
         """
-        tmp = {key:getattr(self, key, '') for key in self.__slots__ \
-                if getattr(self, key, '')}
-        format_date = lambda x: x.strftime('%Y-%m-%d %H:%M') if x else ''
+        tmp = {
+            key: getattr(self, key, '')
+            for key in self.__slots__
+            if getattr(self, key, '')
+        }
+
+        def format_date(x: datetime) -> str:
+            if x:
+                return x.strftime('%Y-%m-%d %H:%M')
+            return ''
+
         tmp['upload_date'] = format_date(tmp['upload_date'])
         tmp['exif_date'] = format_date(tmp.get('exif_date', None))
         tmp['prview_url'] = self.get_file_path(tmp['image_md5'],
@@ -213,6 +227,4 @@ class Image_manager():
         :param row: строка из БД
         :return:
         """
-        return cls(**{k:v for k, v in row.items() if k in cls.__slots__})
-
-
+        return cls(**{k: v for k, v in row.items() if k in cls.__slots__})

@@ -1,10 +1,14 @@
+import json
+from json import JSONDecodeError
+
 import asyncpgsa
 from io import BytesIO
 from aiohttp import web
 from aiohttp.web_response import Response
+from asyncpg import PostgresError, InterfaceError
 from sqlalchemy import text, func, select
 from image_manager.db_models import Images
-from image_manager.file_manager import Image_manager
+from image_manager.file_manager import ImageManager
 
 
 class ImageView(web.View):
@@ -19,37 +23,45 @@ class ImageView(web.View):
         """
         return await self.render_page()
 
-    async def post(self):
+    async def post(self) -> Response:
         """
-                Обработчик запросов типа POST
-                Запрос должен содержать данные формы типа multipart/form-data
-                Берет на себя обработку входных данных
-                Проверяет тип файла
-                Проверяет существование изображения
-                Создает тумбы картинки
-                Сохраняет изображения
-                Сохраняет данные о изображении в БД
-                :return: Response
-                """
+            Обработчик запросов типа POST
+            Запрос должен содержать данные формы типа multipart/form-data
+            Берет на себя обработку входных данных
+            Проверяет тип файла
+            Проверяет существование изображения
+            Создает тумбы картинки
+            Сохраняет изображения
+            Сохраняет данные о изображении в БД
+            :return: Response
+        """
         form_data = await self.fetch_form_data()
-        IM = Image_manager(**form_data)
-        if await self.exists(IM.image_md5):
-            return await self.render_page(reason='Данное изображение уже существует!!!')
+        im = ImageManager(**form_data)
+        if await self.exists(im.image_md5):
+            return await self.render_page(reason='Данное изображение '
+                                                 'уже существует!!!')
         try:
-            IM.load_image()
+            im.load_image()
         except IOError:
-            return await self.render_page(reason='Загружаемый файл не является изображением!!!')
-        IM.make_thumb()
-        IM.get_exif_data()
+            return await self.render_page(reason='Загружаемый файл не '
+                                                 'является изображением!!!')
+        im.make_thumb()
+        im.get_exif_data()
         try:
-            IM.write_files(self.request.app.upload_path)
-        except:
+            im.write_files(self.request.app.upload_path)
+        except (OSError, ValueError, IOError):
             return await self.render_page(reason=' Не удалось сохранить файл')
+        save_error = False
         try:
-            await self.save_to_db(IM.as_dict())
-        except:
-            IM.delete_image(self.request.app.upload_path)
-            return await self.render_page(reason=' Не удалось сохранить запись в БД')
+            await self.save_to_db(im.as_dict())
+        except (InterfaceError, PostgresError):
+            save_error = True
+        if save_error:
+            try:
+                im.delete_image(self.request.app.upload_path)
+            except OSError:
+                return await self.render_page(reason='Не удалось сохранить '
+                                                     'запись в БД')
         raise web.HTTPFound('/')
 
     async def delete(self):
@@ -61,33 +73,46 @@ class ImageView(web.View):
         Удаляет картинки из хранилища
         :return: Response
         """
-        data = await self.request.json()
+        data = await self.request.text()
         try:
-            id = int(data['id'])
-        except:
-            return Response(body='Неверный идентификатор', status=400, headers={'Content-Type': 'text/html'})
+            id = int(json.loads(data)['id'])
+        except (JSONDecodeError, TypeError, ValueError):
+            return Response(
+                body='Неверный формат входных данных',
+                status=400,
+                headers={'Content-Type': 'text/html'})
         query = Images.select().where(Images.c.id == id)
         query_string, params = asyncpgsa.compile_query(query)
         try:
             async with self.request.app.db.acquire() as conn:
                 res = await conn.fetchrow(query_string, *params)
-        except:
-            return Response(body='Ошибка при получении записи из БД', status=500, headers={'Content-Type': 'text/html'})
+        except (InterfaceError, PostgresError):
+            return Response(body='Ошибка при получении записи из БД',
+                            status=500,
+                            headers={'Content-Type': 'text/html'})
         if not res:
-            return Response(body='Изображение не найдено', status=404, headers={'Content-Type': 'text/html'})
-        img = Image_manager.init_from_db_row(res)
+            return Response(body='Изображение не найдено',
+                            status=404,
+                            headers={'Content-Type': 'text/html'})
+        img = ImageManager.init_from_db_row(res)
         query = Images.delete().where(Images.c.id == id)
         query_string, params = asyncpgsa.compile_query(query)
         try:
             async with self.request.app.db.acquire() as conn:
                 await conn.fetchrow(query_string, *params)
-        except:
-            return Response(body='Ошибка при удалении записи в БД', status=500, headers={'Content-Type': 'text/html'})
+        except (InterfaceError, PostgresError):
+            return Response(body='Ошибка при удалении записи в БД',
+                            status=500,
+                            headers={'Content-Type': 'text/html'})
         try:
             img.delete_image(self.request.app.upload_path)
-        except:
-            return Response(body='Ошибка при удалении файла', status=500, headers={'Content-Type': 'text/html'})
-        return Response(body='OK', status=200, headers={'Content-Type': 'text/html'})
+        except OSError:
+            return Response(body='Ошибка при удалении файла',
+                            status=500,
+                            headers={'Content-Type': 'text/html'})
+        return Response(body='OK',
+                        status=200,
+                        headers={'Content-Type': 'text/html'})
 
     def fetch_query_data(self) -> dict:
         """
@@ -99,14 +124,15 @@ class ImageView(web.View):
         legal_keys = ['limit', 'offset']
         data = None
         try:
-            data = {key: int(self.request.query.getone(key, 0))
+            data = {
+                key: int(self.request.query.getone(key, 0))
                 for key in self.request.query.keys()
-                if key in legal_keys}
+                if key in legal_keys
+            }
         finally:
             if not data:
                 data = dict(zip(legal_keys, [30, 0]))
         return data
-
 
     async def fetch_form_data(self):
         """
@@ -117,7 +143,7 @@ class ImageView(web.View):
         """
         original_file_name = None
         file_type = None
-        user_image_name=None
+        user_image_name = None
         file_size = 0
         file = BytesIO()
         reader = await self.request.multipart()
@@ -155,13 +181,12 @@ class ImageView(web.View):
         :param filename: Имя файла (md5_sum от содержимого файла)
         :return: bool
         """
-        query = select([func.count(text('*'))])\
-            .select_from(Images.select()\
-            .where(Images.c.image_md5==filename)\
-            .alias())
+        subquery = Images.select().where(Images.c.image_md5 == filename)\
+            .alias()
+        query = select([func.count(text('*'))]).select_from(subquery)
         query_string, params = asyncpgsa.compile_query(query)
         async with self.request.app.db.acquire() as conn:
-            if await conn.fetchval(query_string, *params)>0:
+            if await conn.fetchval(query_string, *params) > 0:
                 return True
         return False
 
@@ -174,14 +199,13 @@ class ImageView(web.View):
         for key, val in image_object.items():
             col = getattr(Images.c, key, None)
             if col is not None:
-                if col.type.python_type!=type(val) and val:
+                if col.type.python_type != type(val) and val:
                     image_object[key] = col.type.python_type(val)
         res = None
         query = Images.insert().values(**image_object)
         query_string, params = asyncpgsa.compile_query(query)
         async with self.request.app.db.acquire() as conn:
             await conn.fetchrow(query_string, *params)
-
 
     async def render_page(self, reason=''):
         """
@@ -209,13 +233,10 @@ class ImageView(web.View):
         res = []
         async with self.request.app.db.acquire() as conn:
             for row in await conn.fetch(query_string, *params):
-                tmp = Image_manager.init_from_db_row(row)
+                tmp = ImageManager.init_from_db_row(row)
                 res.append(tmp.serialize())
         template = self.request.app.jinja.get_template('index.html')
         data = await template.render_async(res=res, reason=reason)
-        return Response(body=data, status=200, headers={'Content-Type':'text/html'})
-
-
-
-
-
+        return Response(body=data,
+                        status=200,
+                        headers={'Content-Type': 'text/html'})
