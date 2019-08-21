@@ -29,9 +29,11 @@ def get_config():
     from config import dsn
     return dsn
 
+
 async def shutdown(app):
     await app.db.close()
     sys.exit(0)
+
 
 async def init_app(loop):
     """
@@ -53,7 +55,6 @@ async def init_app(loop):
     app.on_shutdown.append(shutdown)
 
     return app
-
 
 
 loop = asyncio.get_event_loop()

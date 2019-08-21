@@ -132,8 +132,8 @@ class ImageView(web.View):
             }
         finally:
             rows_per_page = data.get('rows_per_page', 30)
-            if rows_per_page>30:
-                rows_per_page=30
+            if rows_per_page > 30:
+                rows_per_page = 30
             page = data.get('page', 1)
         return rows_per_page, page
 
