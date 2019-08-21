@@ -142,7 +142,7 @@ class ImageManager:
         if os.path.exists(base_path):
             return
         else:
-            os.makedirs(base_path, mode=0o711)
+            os.makedirs(base_path, mode=0o766)
 
     def load_image(self):
         """

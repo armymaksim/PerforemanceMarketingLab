@@ -2,13 +2,11 @@
 Инициализация веб сервиса
 """
 import asyncio
-import functools
-import signal
 import sys
 import asyncpg
 from aiohttp import web
 from .view import ImageView
-from importlib._bootstrap_external import SourceFileLoader
+from importlib.machinery import SourceFileLoader
 from jinja2 import Environment, PackageLoader, select_autoescape
 env = Environment(
     loader=PackageLoader('image_manager', 'templates'),
@@ -26,8 +24,9 @@ def get_config():
             "config",
             '/usr/local/etc/image_manager/config.py'
         ).load_module()
-    from config import dsn
-    return dsn
+    if hasattr(config, 'dsn'):
+        return config.dsn
+    raise ValueError('Нет настроек подключения к БД')
 
 
 async def shutdown(app):
@@ -35,10 +34,9 @@ async def shutdown(app):
     sys.exit(0)
 
 
-async def init_app(loop):
+async def init_app():
     """
-
-    :param loop: eventloop
+        Инициализируем приложение
     :return:
     """
     app = web.Application()
@@ -58,7 +56,7 @@ async def init_app(loop):
 
 
 loop = asyncio.get_event_loop()
-app = loop.run_until_complete(init_app(loop))
+app = loop.run_until_complete(init_app())
 
 
 def run(port=8080):
